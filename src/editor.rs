@@ -6,6 +6,11 @@ use crate::terminal::Terminal;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
+pub struct Position {
+    pub x: usize,
+    pub y: usize,
+}
+
 fn die(e: &std::io::Error) {
     Terminal::clean_screen();
     panic!("{}", e);
@@ -14,6 +19,7 @@ fn die(e: &std::io::Error) {
 pub struct Editor {
     should_quit: bool,
     terminal: Terminal,
+    cursor_position: Position,
 }
 
 impl Editor {
@@ -34,13 +40,13 @@ impl Editor {
     fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
         // print!("\x1b[0J");
         Terminal::cursor_hide();
-        Terminal::cursor_position(0, 0);
+        Terminal::cursor_position(&mut self.cursor_position);
         if self.should_quit {
             Terminal::clean_screen();
             println!("Goodbye.\r");
         } else {
             self.draw_rows();
-            Terminal::cursor_position(0, 0);
+            Terminal::cursor_position(&mut self.cursor_position);
         }
         Terminal::cursor_show();
         Terminal::flush()
@@ -80,9 +86,44 @@ impl Editor {
                 }
             }
             Key::Ctrl('q') => self.should_quit = true,
+            Key::Up
+            | Key::Down
+            | Key::Left
+            | Key::Right
+            | Key::PageUp
+            | Key::PageDown
+            | Key::End
+            | Key::Home => self.move_cursor(pressed_key),
             _ => println!("{:?}\r", pressed_key),
         };
         Ok(())
+    }
+
+    fn move_cursor(&mut self, key: Key) {
+        let Position { mut x, mut y } = self.cursor_position;
+        let size = self.terminal.size();
+        let height = size.height.saturating_sub(1) as usize;
+        let width = size.width.saturating_sub(1) as usize;
+        match key {
+            Key::Up => y = y.saturating_sub(1),
+            Key::Down => {
+                if y < height {
+                    y = y.saturating_add(1)
+                }
+            }
+            Key::Left => x = x.saturating_sub(1),
+            Key::Right => {
+                if x < width {
+                    x = x.saturating_add(1)
+                }
+            }
+            Key::PageUp => y = 0,
+            Key::PageDown => y = height,
+            Key::Home => x = 0,
+            Key::End => x = width,
+            _ => (),
+        }
+        self.cursor_position = Position { x, y }
     }
 }
 
@@ -91,6 +132,7 @@ impl Default for Editor {
         Self {
             should_quit: false,
             terminal: Terminal::default().expect("Failed to initialize terminal"),
+            cursor_position: Position { x: 0, y: 0 },
         }
     }
 }
