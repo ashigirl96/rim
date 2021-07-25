@@ -23,6 +23,7 @@ pub struct Editor {
 }
 
 impl Editor {
+    // process_keypressによって状態を変更して、refresh_screenで画面をレンダリングする
     pub fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_screen() {
@@ -37,8 +38,8 @@ impl Editor {
         }
     }
 
+    // 毎度画面を再レンダリングする
     fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
-        // print!("\x1b[0J");
         Terminal::cursor_hide();
         Terminal::cursor_position(&mut self.cursor_position);
         if self.should_quit {
@@ -52,6 +53,7 @@ impl Editor {
         Terminal::flush()
     }
 
+    // Welcome を画面中央にレンダリングする
     fn draw_welcome_message(&self) {
         let mut welcome_message = format!("Hecto Editor -- version {}", VERSION);
         let width = self.terminal.size().width as usize;
@@ -63,6 +65,7 @@ impl Editor {
         println!("{}\r", welcome_message);
     }
 
+    // それぞれの行をレンダリングする
     fn draw_rows(&self) {
         let height = self.terminal.size().height;
         for row in 0..height - 1 {
@@ -75,6 +78,7 @@ impl Editor {
         }
     }
 
+    // キー入力を待ち、そのキーに対応した画面の出力をする
     fn process_keypress(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
@@ -99,6 +103,7 @@ impl Editor {
         Ok(())
     }
 
+    // カーソルの座標を移動させる
     fn move_cursor(&mut self, key: Key) {
         let Position { mut x, mut y } = self.cursor_position;
         let size = self.terminal.size();
