@@ -4,6 +4,8 @@ use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
 use crate::terminal::Terminal;
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 fn die(e: &std::io::Error) {
     Terminal::clean_screen();
     panic!("{}", e);
@@ -31,20 +33,39 @@ impl Editor {
 
     fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
         // print!("\x1b[0J");
-        Terminal::clean_screen();
+        Terminal::cursor_hide();
         Terminal::cursor_position(0, 0);
         if self.should_quit {
+            Terminal::clean_screen();
             println!("Goodbye.\r");
         } else {
             self.draw_rows();
             Terminal::cursor_position(0, 0);
         }
+        Terminal::cursor_show();
         Terminal::flush()
     }
 
+    fn draw_welcome_message(&self) {
+        let mut welcome_message = format!("Hecto Editor -- version {}", VERSION);
+        let width = self.terminal.size().width as usize;
+        let len = welcome_message.len();
+        let padding = width.saturating_sub(len) / 2;
+        let spaces = " ".repeat(padding.saturating_sub(1));
+        welcome_message = format!("~{}{}", spaces, welcome_message);
+        welcome_message.truncate(width);
+        println!("{}\r", welcome_message);
+    }
+
     fn draw_rows(&self) {
-        for _ in 0..self.terminal.size().height {
-            println!("~\r");
+        let height = self.terminal.size().height;
+        for row in 0..height - 1 {
+            Terminal::clear_current_line();
+            if row == height / 3 {
+                self.draw_welcome_message();
+            } else {
+                println!("~\r");
+            }
         }
     }
 
