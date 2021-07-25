@@ -1,34 +1,47 @@
-use std::io::{self, stdout, Read};
+use std::io::{self, stdout};
+
+use termion::event::Key;
+use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
-fn to_ctrl_byte(c: char) -> u8 {
-    let byte = c as u8;
-    byte & 0b0001_1111 // 先頭3bitが0だと、ctrl-keyになる
-}
-
 fn die(e: std::io::Error) {
-    panic!(e);
+    panic!("{}", e);
 }
 
 fn main() {
     let _stdout = stdout().into_raw_mode().unwrap();
 
-    for b in io::stdin().bytes() {
-        match b {
-            Ok(b) => {
-                let c = b as char;
-                if c.is_control() { // tabとかdeleteとか. ASCII codes 0-31 and 127
-                    println!("\r{:?}\r", b);
-                } else {
-                    println!("{:?} ({})\r", b, c);
+    for key in io::stdin().keys() {
+        match key {
+            Ok(key) => match key {
+                Key::Char(ch) => {
+                    if ch.is_control() {
+                        println!("\r{:?}\r", ch as u8);
+                    } else {
+                        println!("{:?} ({})\r", ch as u8, ch);
+                    }
                 }
-                println!("{:#b}\r", b);
-                if b == to_ctrl_byte('q') {
-                    break;
-                }
-            }
+                Key::Ctrl('q') => break,
+                // Key::Backspace => {}
+                // Key::Left => {}
+                // Key::Right => {}
+                // Key::Up => {}
+                // Key::Down => {}
+                // Key::Home => {}
+                // Key::End => {}
+                // Key::PageUp => {}
+                // Key::PageDown => {}
+                // Key::BackTab => {}
+                // Key::Delete => {}
+                // Key::Insert => {}
+                // Key::F(_) => {}
+                // Key::Alt(_) => {}
+                // Key::Null => {}
+                // Key::Esc => {}
+                // Key::__IsNotComplete => {}
+                _ => println!("{:?}\r", key),
+            },
             Err(err) => die(err),
         }
-
     }
 }
