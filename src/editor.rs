@@ -2,7 +2,7 @@ use std::io::{self, stdout, Write};
 
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
-use crate::terminal::Terminal;
+use crate::Terminal;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 

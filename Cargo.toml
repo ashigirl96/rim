@@ -1,5 +1,5 @@
 [package]
-name = "editor-rs"
+name = "rim"
 version = "0.1.0"
 edition = "2018"
 

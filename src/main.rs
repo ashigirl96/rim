@@ -1,7 +1,4 @@
-mod editor;
-mod terminal;
-
-use editor::Editor;
+use rim::Editor;
 
 fn main() {
     Editor::default().run();
