@@ -3,6 +3,7 @@ use std::io::{self, stdout, Write};
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 
 use crate::{Document, Row, Terminal};
+use std::env;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -21,16 +22,25 @@ pub struct Editor {
     should_quit: bool,
     terminal: Terminal,
     document: Document,
-    cursor_position: Position,
+    cursor_position: Position, // ドキュメントの座標
+    offset: Position,          // スクロール時の画面の原点
 }
 
 impl Default for Editor {
     fn default() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let document = if args.len() > 1 {
+            let filename = &args[1];
+            Document::open(&filename).unwrap_or_default()
+        } else {
+            Document::default()
+        };
         Self {
             should_quit: false,
             terminal: Terminal::default().expect("Failed to initialize terminal"),
-            document: Document::open(),
+            document,
             cursor_position: Position::default(),
+            offset: Position::default(),
         }
     }
 }
@@ -60,7 +70,13 @@ impl Editor {
             println!("Goodbye.\r");
         } else {
             self.draw_rows();
-            Terminal::cursor_position(&mut self.cursor_position);
+            // スクロールしている場合、
+            // "カーソルの表示座標" = "内部で持ってるカーソルの座標" - "オフセット"
+            // という相対位置にあるもの
+            Terminal::cursor_position(&Position {
+                x: self.cursor_position.x.saturating_sub(self.offset.x),
+                y: self.cursor_position.y.saturating_sub(self.offset.y),
+            })
         }
         Terminal::cursor_show();
         Terminal::flush()
@@ -79,8 +95,9 @@ impl Editor {
     }
 
     pub fn draw_row(&self, row: &Row) {
-        let start = 0;
-        let end = self.terminal.size().width as usize;
+        let width = self.terminal.size().width as usize;
+        let start = self.offset.x;
+        let end = start + width;
         let row = row.render(start, end);
         println!("{}\r", row)
     }
@@ -90,7 +107,8 @@ impl Editor {
         let height = self.terminal.size().height;
         for terminal_row in 0..height - 1 {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(terminal_row as usize) {
+            // スクロールを考慮して、offsetを加算する
+            if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
                 self.draw_row(row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
@@ -112,6 +130,7 @@ impl Editor {
                 }
             }
             Key::Ctrl('q') => self.should_quit = true,
+            Key::Ctrl('d' | 'u') => self.move_vim_binding(pressed_key),
             Key::Up
             | Key::Down
             | Key::Left
@@ -122,15 +141,48 @@ impl Editor {
             | Key::Home => self.move_cursor(pressed_key),
             _ => println!("{:?}\r", pressed_key),
         };
+        self.scroll();
         Ok(())
+    }
+
+    // スクロール
+    fn scroll(&mut self) {
+        let Position { x, y } = self.cursor_position;
+        let width = self.terminal.size().width as usize;
+        let height = self.terminal.size().height as usize;
+        let mut offset = &mut self.offset;
+        if y < offset.y {
+            offset.y = y;
+        } else if y >= offset.y.saturating_add(height) {
+            offset.y = y.saturating_sub(height).saturating_add(1);
+        }
+        if x < offset.x {
+            offset.x = x;
+        } else if x >= offset.x.saturating_add(width) {
+            offset.x = x.saturating_sub(width).saturating_add(1);
+        }
+    }
+
+    fn move_vim_binding(&mut self, key: Key) {
+        let Position { mut x, mut y } = self.cursor_position;
+        let height = self.terminal.size().height as usize;
+        match key {
+            Key::Ctrl('d') => y = y.saturating_add(height / 2),
+            Key::Ctrl('u') => y = y.saturating_sub(height / 2),
+            _ => (),
+        }
+        self.cursor_position = Position { x, y }
     }
 
     // カーソルの座標を移動させる
     fn move_cursor(&mut self, key: Key) {
         let Position { mut x, mut y } = self.cursor_position;
-        let size = self.terminal.size();
-        let height = size.height.saturating_sub(1) as usize;
-        let width = size.width.saturating_sub(1) as usize;
+        let height = self.document.len();
+        let width = if let Some(row) = self.document.row(y) {
+            row.len()
+        } else {
+            0
+        };
         match key {
             Key::Up => y = y.saturating_sub(1),
             Key::Down => {
