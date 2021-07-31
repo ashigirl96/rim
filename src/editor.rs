@@ -178,7 +178,7 @@ impl Editor {
     fn move_cursor(&mut self, key: Key) {
         let Position { mut x, mut y } = self.cursor_position;
         let height = self.document.len();
-        let width = if let Some(row) = self.document.row(y) {
+        let mut width = if let Some(row) = self.document.row(y) {
             row.len()
         } else {
             0
@@ -201,6 +201,16 @@ impl Editor {
             Key::Home => x = 0,
             Key::End => x = width,
             _ => (),
+        }
+        // y: キーによって更新された新たなy座標。このy座標に対応する行の長さを最長幅とする。
+        // xが最長幅よりながければ、最長幅に合わせる
+        width = if let Some(row) = self.document.row(y) {
+            row.len()
+        } else {
+            0
+        };
+        if x > width {
+            x = width;
         }
         self.cursor_position = Position { x, y }
     }
