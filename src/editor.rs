@@ -2,9 +2,10 @@ use std::io::{self, stdout, Write};
 
 use termion::{color, event::Key, input::TermRead, raw::IntoRawMode};
 
-use crate::{Document, Row, Terminal};
+use crate::{Document, Row, StatusMessage, Terminal};
 use std::env;
 use std::ops::Add;
+use std::time::{Duration, Instant};
 
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
@@ -27,14 +28,22 @@ pub struct Editor {
     document: Document,
     cursor_position: Position, // ドキュメントの座標
     offset: Position,          // スクロール時の画面の原点
+    status_message: StatusMessage,
 }
 
 impl Default for Editor {
     fn default() -> Self {
         let args: Vec<String> = env::args().collect();
+        let mut initial_status = String::from("HELP: Ctrl-Q = quit");
         let document = if args.len() > 1 {
             let filename = &args[1];
-            Document::open(&filename).unwrap_or_default()
+
+            if let Ok(doc) = Document::open(&filename) {
+                doc
+            } else {
+                initial_status = format!("ERR: Could not open file: {}", filename);
+                Document::default()
+            }
         } else {
             Document::default()
         };
@@ -44,6 +53,7 @@ impl Default for Editor {
             document,
             cursor_position: Position::default(),
             offset: Position::default(),
+            status_message: StatusMessage::from(initial_status),
         }
     }
 }
@@ -275,5 +285,11 @@ impl Editor {
     // メッセージバー
     fn draw_message_bar(&self) {
         Terminal::clear_current_line();
+        let message = &self.status_message;
+        if Instant::now() - message.time < Duration::new(5, 0) {
+            let mut text = message.text.clone();
+            text.truncate(self.terminal.size().width as usize);
+            println!("{}\r", text);
+        }
     }
 }
