@@ -187,10 +187,20 @@ impl Editor {
                     y = y.saturating_add(1)
                 }
             }
-            Key::Left => x = x.saturating_sub(1),
+            Key::Left => {
+                if x > 0 {
+                    x = x.saturating_sub(1)
+                } else if y > 0 {
+                    y = y.saturating_sub(1);
+                    x = self.row_width(&y);
+                }
+            }
             Key::Right => {
                 if x < width {
                     x = x.saturating_add(1)
+                } else if y < height {
+                    y = y.saturating_add(1);
+                    x = 0;
                 }
             }
             Key::PageUp => {
