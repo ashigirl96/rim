@@ -176,13 +176,10 @@ impl Editor {
 
     // カーソルの座標を移動させる
     fn move_cursor(&mut self, key: Key) {
+        let terminal_height = self.terminal.size().height as usize;
         let Position { mut x, mut y } = self.cursor_position;
         let height = self.document.len();
-        let mut width = if let Some(row) = self.document.row(y) {
-            row.len()
-        } else {
-            0
-        };
+        let mut width = self.row_width(&y);
         match key {
             Key::Up => y = y.saturating_sub(1),
             Key::Down => {
@@ -196,22 +193,39 @@ impl Editor {
                     x = x.saturating_add(1)
                 }
             }
-            Key::PageUp => y = 0,
-            Key::PageDown => y = height,
+            Key::PageUp => {
+                y = if y < terminal_height {
+                    0
+                } else {
+                    y - terminal_height
+                }
+            }
+            Key::PageDown => {
+                y = if height < y.saturating_add(terminal_height) {
+                    height
+                } else {
+                    terminal_height + y
+                }
+            }
             Key::Home => x = 0,
             Key::End => x = width,
             _ => (),
         }
         // y: キーによって更新された新たなy座標。このy座標に対応する行の長さを最長幅とする。
         // xが最長幅よりながければ、最長幅に合わせる
-        width = if let Some(row) = self.document.row(y) {
-            row.len()
-        } else {
-            0
-        };
+        width = self.row_width(&y);
         if x > width {
             x = width;
         }
         self.cursor_position = Position { x, y }
+    }
+
+    // y座標に対する行の最大幅
+    fn row_width(&self, y: &usize) -> usize {
+        if let Some(row) = self.document.row(*y) {
+            row.len()
+        } else {
+            0
+        }
     }
 }
