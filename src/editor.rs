@@ -1,10 +1,13 @@
 use std::io::{self, stdout, Write};
 
-use termion::{event::Key, input::TermRead, raw::IntoRawMode};
+use termion::{color, event::Key, input::TermRead, raw::IntoRawMode};
 
 use crate::{Document, Row, Terminal};
 use std::env;
+use std::ops::Add;
 
+const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
+const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 #[derive(Default)]
@@ -70,6 +73,8 @@ impl Editor {
             println!("Goodbye.\r");
         } else {
             self.draw_rows();
+            self.draw_status_bar();
+            self.draw_message_bar();
             // スクロールしている場合、
             // "カーソルの表示座標" = "内部で持ってるカーソルの座標" - "オフセット"
             // という相対位置にあるもの
@@ -105,7 +110,7 @@ impl Editor {
     // それぞれの行をレンダリングする
     fn draw_rows(&self) {
         let height = self.terminal.size().height;
-        for terminal_row in 0..height - 1 {
+        for terminal_row in 0..height {
             Terminal::clear_current_line();
             // スクロールを考慮して、offsetを加算する
             if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
@@ -237,5 +242,38 @@ impl Editor {
         } else {
             0
         }
+    }
+
+    // ステータスバー
+    fn draw_status_bar(&self) {
+        let mut status;
+        let width = self.terminal.size().width as usize;
+        let mut filename = "[Untitled]".to_string();
+        if let Some(name) = &self.document.filename {
+            filename = name.clone();
+            filename.truncate(20);
+        }
+        status = format!("{} - {} lines", filename, self.document.len());
+        let line_indicator = format!(
+            "{}/{}",
+            self.cursor_position.y.saturating_add(1),
+            self.document.len(),
+        );
+        let len = status.len() + line_indicator.len();
+        if width > len {
+            status.push_str(&" ".repeat(width - len));
+        }
+        status = format!("{}{}", status, line_indicator);
+        status.truncate(width);
+        Terminal::draw_bg_color(STATUS_BG_COLOR);
+        Terminal::draw_fg_color(STATUS_FG_COLOR);
+        println!("{}\r", status);
+        Terminal::reset_bg_color();
+        Terminal::reset_fg_color();
+    }
+
+    // メッセージバー
+    fn draw_message_bar(&self) {
+        Terminal::clear_current_line();
     }
 }

@@ -1,8 +1,11 @@
 use crate::editor::Position;
 use std::io::{self, stdout, Write};
-use termion::event::Key;
-use termion::input::TermRead;
-use termion::raw::{IntoRawMode, RawTerminal};
+use termion::{
+    color,
+    event::Key,
+    input::TermRead,
+    raw::{IntoRawMode, RawTerminal},
+};
 
 pub struct Size {
     pub width: u16,
@@ -10,7 +13,7 @@ pub struct Size {
 }
 
 pub struct Terminal {
-    size: Size,
+    size: Size, // 移動できる画面のサイズ
     _stdout: RawTerminal<io::Stdout>,
 }
 
@@ -22,6 +25,8 @@ impl Terminal {
     // raw_modeにすることで、標準入力が出力されない
     pub fn default() -> Result<Self, io::Error> {
         let (width, height) = termion::terminal_size()?;
+        // ステータスバーとメッセージバー用に2行分移動できる高さを減らしている
+        let height = height.saturating_sub(2);
         Ok(Self {
             size: Size { width, height },
             _stdout: stdout().into_raw_mode()?,
@@ -70,5 +75,23 @@ impl Terminal {
                 return key;
             }
         }
+    }
+
+    // その行が指定された色の背景色になる
+    pub fn draw_bg_color(color: color::Rgb) {
+        print!("{}", color::Bg(color));
+    }
+
+    // その行が元の背景色になる
+    pub fn reset_bg_color() {
+        print!("{}", color::Bg(color::Reset));
+    }
+
+    pub fn draw_fg_color(color: color::Rgb) {
+        print!("{}", color::Fg(color));
+    }
+
+    pub fn reset_fg_color() {
+        print!("{}", color::Fg(color::Reset));
     }
 }
